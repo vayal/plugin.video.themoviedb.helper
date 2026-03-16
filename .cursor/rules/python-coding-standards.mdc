@@ -1,0 +1,128 @@
+---
+description: Python coding conventions and patterns matching the existing TMDb Helper codebase
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python Coding Standards
+
+## General Style
+
+- Follow PEP 8 for naming and formatting.
+- Use f-strings for string formatting (matching existing codebase).
+- No type hints -- the codebase does not use them; maintain consistency.
+- Keep functions focused and reasonably short.
+
+## Import Patterns
+
+### Lazy Imports (Preferred)
+
+Import Kodi modules and heavy dependencies inside functions to minimize plugin startup time:
+
+```python
+def show_dialog(message):
+    from xbmcgui import Dialog
+    Dialog().ok('TMDb Helper', message)
+```
+
+### Top-Level Imports
+
+Only for lightweight, always-needed modules:
+
+```python
+from urllib.parse import unquote_plus
+from tmdbhelper.lib.addon.plugin import get_setting
+```
+
+### Absolute Imports Only
+
+Always use absolute imports. No implicit relative imports:
+
+```python
+from tmdbhelper.lib.addon.logger import kodi_log
+from tmdbhelper.lib.api.tmdb.api import TMDb
+```
+
+## Logging
+
+- Never use `print()`. Always use the addon's logging wrapper:
+
+```python
+from tmdbhelper.lib.addon.logger import kodi_log
+kodi_log('Something happened', 1)  # 1 = debug level
+```
+
+- For performance profiling, use the timer decorators:
+
+```python
+from tmdbhelper.lib.addon.logger import timer_report, timer_method
+
+@timer_report
+def expensive_operation(self, *args, **kwargs):
+    ...
+```
+
+## Error Handling
+
+- Catch specific exceptions, not bare `except:`.
+- Use the `kodi_try_except` decorator for methods that should fail silently with logging:
+
+```python
+from tmdbhelper.lib.addon.logger import kodi_try_except
+
+@kodi_try_except('mymodule.my_function')
+def my_function():
+    ...
+```
+
+- For critical errors, log with `kodi_log(message, 2)` (error level) and re-raise if appropriate.
+
+## Directory Container Pattern
+
+New directory listings follow the container class pattern:
+
+1. Create a container class (or reuse an existing one from `lib/items/`).
+2. The container fetches data, builds `ListItem` objects, and calls `xbmcplugin.addDirectoryItems()`.
+3. Register the route in `ROUTE_NOID` or `ROUTE_TMDBID` in `resources/tmdbhelper/lib/addon/consts.py`.
+4. The route entry maps an `info` param value to a module path and class name.
+
+## API Client Pattern
+
+API clients follow a consistent structure:
+
+1. Subpackage under `lib/api/<service>/`.
+2. Base URL and authentication configured in the client class.
+3. Use `requests` for HTTP calls (via `script.module.requests`).
+4. Cache responses using the addon's cache utilities with appropriate durations:
+   - `CACHE_SHORT` (1 day) -- volatile data (trending, now playing).
+   - `CACHE_MEDIUM` (7 days) -- moderately stable data (popular lists).
+   - `CACHE_LONG` (14 days) -- stable data (movie details, cast).
+   - `CACHE_EXTENDED` (90 days) -- rarely changing data (person info, old movie details).
+
+## URL Parameter Handling
+
+Always use the established parser utilities:
+
+```python
+from jurialmunkey.parser import parse_paramstring, reconfigure_legacy_params
+
+params = reconfigure_legacy_params(**parse_paramstring(paramstring))
+```
+
+Do not manually parse `sys.argv[2]` with `urllib.parse` or string splitting.
+
+## Thread Safety
+
+- Use the existing locker utilities from `lib/files/locker.py` for shared resources.
+- Use context managers for file operations and locks.
+- In the background service, respect `monitor.waitForAbort()` for clean shutdown.
+
+## Adding New Features Checklist
+
+1. Place code in the appropriate subpackage under `resources/tmdbhelper/lib/`.
+2. If adding a new route: add entry to `ROUTE_NOID` or `ROUTE_TMDBID` in `consts.py`.
+3. If adding a new script action: add handler to the routing table in `lib/script/router.py`.
+4. If adding new settings: update `resources/settings.xml` and add localized strings.
+5. If adding a new API: create a subpackage under `lib/api/` following the existing client pattern.
+6. Log appropriately with `kodi_log()`, not `print()`.
+7. Use lazy imports for any Kodi or heavy module imports in handler functions.

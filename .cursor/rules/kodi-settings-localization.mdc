@@ -1,0 +1,106 @@
+---
+description: Kodi addon settings.xml format and strings.po localization standards
+globs: "**/settings.xml, **/strings.po, **/resources/language/**"
+alwaysApply: false
+---
+
+# Kodi Settings and Localization
+
+## settings.xml Format (v1)
+
+The settings file uses Kodi's v1 format at `resources/settings.xml`:
+
+```xml
+<settings version="1">
+  <section id="plugin.video.themoviedb.helper">
+    <category id="general" label="$LOCALIZE[32000]" help="">
+      <group id="1" label="$LOCALIZE[32001]">
+        <setting id="my_setting" type="boolean" label="$LOCALIZE[32002]" help="$LOCALIZE[32003]" default="true">
+          <level>0</level>
+          <control type="toggle" />
+        </setting>
+      </group>
+    </category>
+  </section>
+</settings>
+```
+
+### Hierarchy
+
+`<settings>` -> `<section>` (one per addon) -> `<category>` (tabs) -> `<group>` (visual grouping) -> `<setting>` (individual settings).
+
+### Setting Types
+
+| Type | Description | Control |
+|---|---|---|
+| `boolean` | On/off toggle | `<control type="toggle" />` |
+| `string` | Text input | `<control type="edit" />` |
+| `integer` | Numeric value | `<control type="edit" format="integer" />` or `<control type="spinner" />` |
+| `number` | Float value | `<control type="edit" format="number" />` |
+| `path` | File/folder path | `<control type="button" format="path" />` |
+| `action` | Clickable action | `<control type="button" format="action" />` |
+| `addon` | Addon picker | `<control type="button" format="addon" />` |
+
+### Setting Visibility Levels
+
+| Level | Description |
+|---|---|
+| 0 | Basic -- always visible |
+| 1 | Standard |
+| 2 | Advanced |
+| 3 | Expert |
+| 4 | Internal -- never shown in GUI |
+
+### Dependencies Between Settings
+
+Use `<dependencies>` to show/hide settings conditionally:
+
+```xml
+<setting id="child_setting" type="string" label="...">
+  <dependencies>
+    <dependency type="visible" setting="parent_setting" operator="is">true</dependency>
+  </dependencies>
+</setting>
+```
+
+## strings.po Localization
+
+Localization files live in `resources/language/resource.language.<locale>/strings.po`.
+
+### Format
+
+```po
+msgctxt "#32000"
+msgid "General"
+msgstr ""
+
+msgctxt "#32001"
+msgid "My New Feature"
+msgstr ""
+```
+
+- `msgctxt` -- unique numeric ID prefixed with `#`.
+- `msgid` -- English source text.
+- `msgstr` -- translation (empty in `en_gb`, filled in other locales).
+
+### String ID Ranges
+
+- **0 -- 31999**: Reserved for Kodi core. Never use these.
+- **32000+**: Addon-specific strings. This addon uses IDs starting at `#32000`.
+- When adding new strings, find the next unused ID by checking the existing `strings.po` file.
+
+### Referencing Strings
+
+- In `settings.xml`: `$LOCALIZE[32000]`
+- In Python: `xbmcaddon.Addon().getLocalizedString(32000)` or use the addon's `get_localized(32000)` wrapper from `tmdbhelper.lib.addon.plugin`.
+
+### Adding New Strings
+
+1. Add the new `msgctxt`/`msgid`/`msgstr` entry to `resources/language/resource.language.en_gb/strings.po`.
+2. Use sequential IDs -- do not leave gaps unless reusing a deleted ID.
+3. If adding translations, update the corresponding locale files.
+4. Always add a string before referencing it in `settings.xml` or Python code.
+
+## Existing Locales
+
+This addon supports 16 locales: `en_gb` (default), `de_de`, `es_es`, `fr_fr`, `it_it`, `ja_jp`, `ko_kr`, `nl_nl`, `pl_pl`, `pt_br`, `pt_pt`, `ru_ru`, `sv_se`, `uk_ua`, `zh_cn`, `zh_tw`.

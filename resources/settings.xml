@@ -355,6 +355,28 @@
                         <data>RunScript(plugin.video.themoviedb.helper,library_autoupdate,busy_dialog,force=select)</data>
                     </control>
                 </setting>
+                <setting id="library_autoadd_on_play" type="boolean" label="32537" help="">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle"/>
+                </setting>
+                <setting id="library_autoadd_threshold" type="integer" label="32538" help="" parent="library_autoadd_on_play">
+                    <level>0</level>
+                    <default>80</default>
+                    <constraints>
+                        <minimum>10</minimum>
+                        <step>5</step>
+                        <maximum>100</maximum>
+                    </constraints>
+                    <dependencies>
+                        <dependency type="enable">
+                            <condition operator="is" setting="library_autoadd_on_play">True</condition>
+                        </dependency>
+                    </dependencies>
+                    <control type="slider" format="integer">
+                        <popup>false</popup>
+                    </control>
+                </setting>
             </group>
             <group id="2" label="10039">
                 <setting id="ignore_folderchecking" type="boolean" label="32077" help="">

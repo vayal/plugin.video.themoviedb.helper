@@ -1,0 +1,124 @@
+---
+description: Kodi Python API usage patterns and function reference for addon development
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Kodi Python API Reference
+
+## xbmcplugin -- Plugin Directory Management
+
+```python
+import xbmcplugin
+
+xbmcplugin.addDirectoryItems(handle, [(url, listitem, is_folder), ...], totalItems)
+xbmcplugin.setContent(handle, 'videos')  # or 'movies', 'tvshows', 'episodes', 'musicvideos'
+xbmcplugin.endOfDirectory(handle, succeeded=True, updateListing=False, cacheToDisc=True)
+xbmcplugin.setResolvedUrl(handle, succeeded=True, listitem=play_item)
+xbmcplugin.addSortMethod(handle, xbmcplugin.SORT_METHOD_UNSORTED)
+xbmcplugin.setProperty(handle, key, value)
+xbmcplugin.setPluginCategory(handle, category_name)
+```
+
+- `handle` is always `int(sys.argv[1])` -- the integer passed by Kodi to the plugin.
+- Always call `endOfDirectory()` after adding items, or Kodi shows an error.
+- For playback, items must have `listitem.setProperty("IsPlayable", "true")`.
+
+## xbmcgui -- UI Elements
+
+```python
+from xbmcgui import ListItem, Dialog, Window
+
+li = ListItem(label='Title', offscreen=True)
+li.setArt({'poster': url, 'fanart': url, 'icon': url, 'thumb': url})
+li.setProperty('IsPlayable', 'true')
+
+info_tag = li.getVideoInfoTag()
+info_tag.setTitle('Title')
+info_tag.setMediaType('movie')  # 'movie', 'tvshow', 'season', 'episode'
+info_tag.setYear(2024)
+info_tag.setPlot('Description text')
+info_tag.setGenres(['Action', 'Drama'])
+
+dialog = Dialog()
+dialog.ok('Header', 'Message')
+result = dialog.yesno('Header', 'Question?')
+dialog.notification('Header', 'Message', xbmcgui.NOTIFICATION_INFO, 3000)
+```
+
+- Prefer `offscreen=True` when creating ListItems that won't be immediately displayed (performance).
+- Use `getVideoInfoTag()` / `InfoTagVideo` instead of the deprecated `setInfo()` for Kodi 20+.
+- This codebase uses `script.module.infotagger` to handle metadata tagging.
+
+## xbmcaddon -- Addon Configuration
+
+```python
+import xbmcaddon
+
+addon = xbmcaddon.Addon()
+addon = xbmcaddon.Addon('plugin.video.themoviedb.helper')
+
+value = addon.getSetting('setting_id')       # always returns string
+addon.setSetting('setting_id', 'value')      # value must be string
+path = addon.getAddonInfo('path')            # addon install directory
+addon_id = addon.getAddonInfo('id')
+version = addon.getAddonInfo('version')
+localized = addon.getLocalizedString(32000)  # from strings.po
+```
+
+- `getSetting()` always returns a string. Cast to `int`, `bool`, etc. as needed.
+- In this codebase, use `get_setting()` from `tmdbhelper.lib.addon.plugin` instead of raw `Addon().getSetting()`.
+
+## xbmcvfs -- File System
+
+```python
+import xbmcvfs
+
+real_path = xbmcvfs.translatePath('special://profile/addon_data/plugin.video.themoviedb.helper/')
+exists = xbmcvfs.exists(path)          # works with special:// paths
+xbmcvfs.mkdirs(path)                   # create directory tree
+dirs, files = xbmcvfs.listdir(path)
+
+f = xbmcvfs.File(path, 'r')
+content = f.read()
+f.close()
+
+xbmcvfs.delete(path)
+xbmcvfs.rmdir(path)
+```
+
+- Use `xbmcvfs` for all file operations instead of `os` / `open()` when working with `special://` paths.
+- `translatePath()` converts `special://` to OS paths -- only needed for `os.path` or stdlib calls.
+
+## xbmc -- Core Functions
+
+```python
+import xbmc
+
+xbmc.log('Message', xbmc.LOGDEBUG)      # LOGDEBUG, LOGINFO, LOGWARNING, LOGERROR
+xbmc.executebuiltin('Container.Refresh')
+xbmc.executebuiltin('RunScript(plugin.video.themoviedb.helper,action=value)')
+xbmc.getCondVisibility('Window.IsActive(home)')  # returns bool
+xbmc.getInfoLabel('System.BuildVersion')
+xbmc.sleep(1000)                         # milliseconds, use sparingly
+
+monitor = xbmc.Monitor()
+monitor.waitForAbort(timeout)            # preferred over xbmc.sleep for services
+player = xbmc.Player()
+```
+
+- Never use `print()` for output. Always use `xbmc.log()` or the addon's `kodi_log()` wrapper.
+- In services, use `monitor.waitForAbort()` instead of `xbmc.sleep()` to respect Kodi shutdown.
+- `executebuiltin()` runs Kodi built-in functions (Container.Refresh, Notification, ActivateWindow, etc.).
+
+## Lazy Imports Pattern
+
+This codebase deliberately uses lazy imports (importing inside functions) to minimize plugin startup time:
+
+```python
+def some_function():
+    from xbmcgui import Dialog
+    Dialog().ok('Title', 'Message')
+```
+
+Follow this pattern for all Kodi module imports inside handler functions. Top-level imports are reserved for lightweight, always-needed modules.

@@ -1,0 +1,91 @@
+---
+description: TMDb Helper project-specific architecture, module layout, and routing patterns
+alwaysApply: true
+---
+
+# TMDb Helper Project Structure
+
+## Module Layout
+
+All addon logic lives under `resources/tmdbhelper/lib/`, organized into subpackages:
+
+```
+resources/tmdbhelper/lib/
+  addon/      Configuration, constants, logging, dialogs, plugin helpers
+  api/        API clients (tmdb, trakt, omdb, fanarttv, mdblist, tvdb, gemini)
+  files/      Cache, downloader, file utilities, locking
+  items/      Directory containers, database, list items, routing
+  monitor/    Background service, player monitor, scrobbler, image monitor, cron
+  player/     Player dialog, action handling, player config
+  query/      Database query helpers (tmdb_id, trakt_id lookups)
+  script/     Script router, methods (sync, discover, play, node maker)
+  update/     Library updates, file writer, builder
+  window/     Window manager, recommendations, event loop
+```
+
+## Plugin Routing (Directory Listings)
+
+1. `resources/plugin.py` creates `Router(handle, paramstring)` from `resources/tmdbhelper/lib/items/router.py`.
+2. `Router.run()` checks `params['info']`:
+   - `info=play` -> `play_player()` for playback resolution.
+   - Otherwise -> `get_directory()` -> `get_container(info)` from `resources/tmdbhelper/lib/items/routes.py`.
+3. `get_container()` looks up `info` in route tables defined in `resources/tmdbhelper/lib/addon/consts.py`:
+   - `ROUTE_NOID`: lists that don't need a TMDb ID (search, discover, trending, Trakt lists, MDbList, TVDb).
+   - `ROUTE_TMDBID`: detail views requiring a TMDb ID (details, seasons, episodes, cast, similar, recommendations).
+4. Each route maps to a container class that fetches data and calls `xbmcplugin.addDirectoryItems()`.
+
+## Script Routing (RunScript Actions)
+
+1. `resources/script.py` creates `Script(*args)` from `resources/tmdbhelper/lib/script/router.py`.
+2. `Script.router()` intersects parsed params with a routing table mapping param names to handler functions.
+3. Script actions include: sync with Trakt, modify artwork, player config, library updates, window management, node creation, context menus, maintenance.
+
+## Background Service
+
+`resources/service.py` runs `ServiceMonitor` from `resources/tmdbhelper/lib/monitor/service.py`:
+- **Cron**: scheduled library auto-updates.
+- **Image monitor**: artwork processing.
+- **Player monitor**: playback state, scrobbling to Trakt.
+- **ListItem monitor**: widget properties, skin integration.
+
+## API Clients
+
+Each API client lives in its own subpackage under `lib/api/`:
+
+| API | Subpackage | Base URL | Auth |
+|---|---|---|---|
+| TMDb v3 | `api/tmdb/` | `https://api.themoviedb.org/3` | Built-in API key |
+| TMDb v4 | `api/tmdb/` | `https://api.themoviedb.org/4` | User access token |
+| Trakt | `api/trakt/` | `https://api.trakt.tv` | OAuth device flow |
+| OMDb | `api/omdb/` | `https://www.omdbapi.com/` | Optional API key from settings |
+| FanartTV | `api/fanarttv/` | `https://webservice.fanart.tv/v3` | Optional client key |
+| MDbList | `api/mdblist/` | `https://api.mdblist.com` | Optional API key |
+| TVDb | `api/tvdb/` | TVDb API | Optional API key |
+| Gemini | `api/gemini/` | Google Gemini | Optional API key |
+
+## Logging
+
+Use the logging utilities from `resources/tmdbhelper/lib/addon/logger.py`:
+- `kodi_log(message, level)` -- wraps `xbmc.log()` with addon prefix.
+- `@timer_report` -- decorator to log execution time of class methods.
+- `@timer_method` -- decorator using `TimerFunc` context manager.
+- `@kodi_try_except` -- decorator for exception handling with logging.
+
+## Key Dependencies
+
+| Dependency | Purpose |
+|---|---|
+| `script.module.jurialmunkey` | Shared parser (`parse_paramstring`, `reconfigure_legacy_params`), logger base |
+| `script.module.infotagger` | Modern metadata tagging (InfoTagVideo) |
+| `script.module.requests` | HTTP requests for API calls |
+| `script.module.pil` | Image processing |
+| `script.module.addon.signals` | Inter-addon signaling |
+| `script.module.qrcode` | QR code generation (Trakt auth) |
+
+## Constants
+
+Centralized in `resources/tmdbhelper/lib/addon/consts.py`:
+- Cache durations: `CACHE_SHORT=1`, `CACHE_MEDIUM=7`, `CACHE_LONG=14`, `CACHE_EXTENDED=90` (days).
+- Image base URLs: `IMAGEPATH_ORIGINAL`, `IMAGEPATH_LARGEPOSTER`, etc. from `https://image.tmdb.org/t/p/`.
+- Player directories: `PLAYERS_BASEDIR_USER`, `PLAYERS_BASEDIR_BUNDLED`, `PLAYERS_BASEDIR_SAVE`.
+- Node directory: `NODE_BASEDIR` under `special://profile/addon_data/`.

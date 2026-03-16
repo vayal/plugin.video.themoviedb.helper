@@ -152,6 +152,7 @@ class PlayerScrobbler():
         self.set_kodi_watched()
         self.set_tmdb_ratings()
         self.update_stats()
+        self.add_to_library_on_watched()
         self.stopped = True
 
     @is_scrobbling
@@ -204,6 +205,17 @@ class PlayerScrobbler():
             episode=self.episode or None,
             sync_type='rating'
         )
+
+    @is_scrobbling
+    def add_to_library_on_watched(self):
+        threshold = get_setting('library_autoadd_threshold', 'int') or 80
+        if self.progress < threshold:
+            return
+        from tmdbhelper.lib.monitor.libadd import add_to_library_on_watched
+        add_to_library_on_watched(
+            self.tmdb_type, self.tmdb_id,
+            season=self.season, episode=self.episode,
+            imdb_id=self.imdb_id, tvdb_id=self.tvdb_id)
 
     @is_scrobbling
     def set_kodi_watched(self):

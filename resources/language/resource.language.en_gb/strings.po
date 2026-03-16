@@ -2685,6 +2685,16 @@ msgctxt "#32536"
 msgid "Unspecified"
 msgstr ""
 
+#: /resources/settings.xml
+msgctxt "#32537"
+msgid "Automatically add to library after watching"
+msgstr ""
+
+#: /resources/settings.xml
+msgctxt "#32538"
+msgid "Minimum watched percentage"
+msgstr ""
+
 msgctxt "#30030"
 msgid "Hindi (India)"
 msgstr ""

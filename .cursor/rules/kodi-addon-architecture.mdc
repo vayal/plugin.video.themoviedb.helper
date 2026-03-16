@@ -1,0 +1,58 @@
+---
+description: Core Kodi addon architecture, structure, and lifecycle rules
+alwaysApply: true
+---
+
+# Kodi Addon Architecture
+
+## Addon Identity
+
+- Addon ID follows the convention `plugin.video.<name>` (lowercase, dots/hyphens/underscores only).
+- Every addon requires an `addon.xml` manifest in the root directory.
+- The addon folder installed under `.kodi/addons/` is **read-only** at runtime.
+- All writable data (caches, configs, user files) goes under `special://profile/addon_data/plugin.video.themoviedb.helper/`.
+
+## Entry Points
+
+This addon registers four extension points in `addon.xml`:
+
+| Extension Point | Entry File | Purpose |
+|---|---|---|
+| `xbmc.python.pluginsource` | `resources/plugin.py` | Video plugin -- handles `plugin://` URLs, directory listings, playback |
+| `xbmc.python.script` | `resources/script.py` | Script actions via `RunScript(plugin.video.themoviedb.helper, ...)` |
+| `xbmc.service` | `resources/service.py` | Background service -- cron, monitors, scrobbling |
+| `xbmc.python.module` | `resources/modules` | Shared Python module (meta path finder for `tmdbhelper.lib`) |
+
+## Plugin Lifecycle
+
+1. Kodi invokes the pluginsource entry point with `sys.argv`:
+   - `sys.argv[0]` = plugin URL base
+   - `sys.argv[1]` = integer handle (cast with `int()`)
+   - `sys.argv[2]` = query string (strip leading `?` with `[1:]`)
+2. For directory listings: build `ListItem` objects, call `xbmcplugin.addDirectoryItems()`, then `xbmcplugin.endOfDirectory()`.
+3. For playback: resolve to a playable URL via `xbmcplugin.setResolvedUrl()`.
+
+## Kodi Python API Modules
+
+| Module | Provides |
+|---|---|
+| `xbmc` | Logging, playback control, conditions, builtins, Monitor, Player |
+| `xbmcgui` | UI elements: Dialog, ListItem, Window, WindowXMLDialog |
+| `xbmcplugin` | Plugin directory management: addDirectoryItems, setContent, endOfDirectory, setResolvedUrl |
+| `xbmcaddon` | Addon metadata, settings access, localized strings |
+| `xbmcvfs` | Virtual filesystem: translatePath, exists, mkdirs, File, listdir |
+
+## Path Handling
+
+- Always use `special://` protocol paths for portability:
+  - `special://home/` -- Kodi home directory
+  - `special://profile/` -- current user profile
+  - `special://profile/addon_data/<addon_id>/` -- addon writable data
+  - `special://home/addons/<addon_id>/` -- addon install directory (read-only)
+- Use `xbmcvfs.translatePath()` only when an OS-level path is required (e.g., `os.path` operations).
+- Never hardcode OS-specific paths like `C:\` or `/home/`.
+
+## Python Version
+
+- Target: **Python 3** (dependency `xbmc.python` version `3.0.1`).
+- Python 2 is not supported. Use Python 3 idioms: f-strings, `dict.items()` returns views, `/` is float division, `//` for integer division.

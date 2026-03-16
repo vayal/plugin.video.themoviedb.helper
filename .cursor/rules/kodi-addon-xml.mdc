@@ -1,0 +1,85 @@
+---
+description: Rules for editing the addon.xml Kodi manifest file
+globs: addon.xml
+alwaysApply: false
+---
+
+# addon.xml Manifest Rules
+
+## Required Root Attributes
+
+The `<addon>` element must always have these four attributes:
+
+```xml
+<addon id="plugin.video.themoviedb.helper"
+       version="6.15.1"
+       name="TMDb Helper"
+       provider-name="jurialmunkey">
+```
+
+- `id` -- must match the addon folder name exactly.
+- `version` -- semantic versioning `MAJOR.MINOR.PATCH`. Bump on every release.
+- `name` -- human-readable display name.
+- `provider-name` -- author/developer name.
+
+## Dependencies (`<requires>`)
+
+```xml
+<requires>
+  <import addon="xbmc.python" version="3.0.1"/>
+  <import addon="script.module.requests" version="2.9.1"/>
+</requires>
+```
+
+- Always include `xbmc.python` with the minimum required version.
+- Add `<import>` entries for every script module the addon depends on.
+- Version numbers are **minimum** versions, not exact pins.
+- Optional dependencies use `optional="true"`: `<import addon="..." version="..." optional="true"/>`.
+
+## Extension Points
+
+Each `<extension>` must have a `point` attribute and its `library` must point to an existing file:
+
+| Point | Library | Purpose |
+|---|---|---|
+| `xbmc.python.pluginsource` | `resources/plugin.py` | Main video plugin |
+| `xbmc.python.script` | `resources/script.py` | Script actions |
+| `xbmc.service` | `resources/service.py` | Background service |
+| `xbmc.python.module` | `resources/modules` | Shared module |
+| `xbmc.addon.metadata` | (none) | Addon metadata |
+
+- The pluginsource extension must include `<provides>video</provides>`.
+- Do not remove or rename extension points without updating the corresponding Python files.
+
+## Metadata Extension
+
+```xml
+<extension point="xbmc.addon.metadata">
+  <reuselanguageinvoker>false</reuselanguageinvoker>
+  <summary lang="en_GB">Short summary</summary>
+  <description lang="en_GB">Longer description</description>
+  <disclaimer lang="en_GB">Data attribution</disclaimer>
+  <license>GPL-3.0-or-later</license>
+  <website>https://github.com/...</website>
+  <forum>https://forum.kodi.tv/...</forum>
+  <assets>
+    <icon>icon.png</icon>
+    <fanart>fanart.jpg</fanart>
+    <clearlogo>clearlogo.png</clearlogo>
+    <screenshot>resources/screenshot-01.jpg</screenshot>
+  </assets>
+</extension>
+```
+
+- Every `<summary>`, `<description>`, and `<disclaimer>` must have a `lang` attribute.
+- When adding a new locale, add entries for all three text elements.
+- `<assets>` paths are relative to the addon root. Verify files exist before referencing them.
+- `<reuselanguageinvoker>` is `false` for this addon -- do not change without understanding the implications (affects global state persistence between invocations).
+
+## Checklist When Editing
+
+1. Bump `version` if making a release-worthy change.
+2. If adding a new Python dependency, add the corresponding `<import>` in `<requires>`.
+3. If adding a new entry point file, add a matching `<extension>` element.
+4. Keep multi-language metadata in sync across all existing locales.
+5. Validate XML is well-formed before committing.
