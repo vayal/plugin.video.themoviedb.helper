@@ -10,6 +10,8 @@ AUTOADDED_FILENAME = 'library_autoadded.json'
 PENDING_WATCHED_FILENAME = 'library_pending_watched.json'
 DEFAULT_POLL_TIMEOUT_SECONDS = 45
 DEFAULT_POLL_INTERVAL_MS = 1500
+FAST_POLL_TIMEOUT_SECONDS = 8
+FAST_POLL_INTERVAL_MS = 500
 
 
 def _load_json(filename):
@@ -51,12 +53,14 @@ def add_to_library_on_watched(
 
     key = f'{tmdb_type}.{tmdb_id}'
     autoadded = _load_json(AUTOADDED_FILENAME)
-    if key in autoadded:
-        return
+    is_already_added = key in autoadded
+    if is_already_added:
+        kodi_log(f'LIBRARY AUTO-ADD: [Dedup] {key}', 2)
 
-    kodi_log(f'LIBRARY AUTO-ADD: {key}', 2)
-    autoadded[key] = True
-    _save_json(AUTOADDED_FILENAME, autoadded)
+    if not is_already_added:
+        kodi_log(f'LIBRARY AUTO-ADD: {key}', 2)
+        autoadded[key] = True
+        _save_json(AUTOADDED_FILENAME, autoadded)
 
     content_id = _queue_pending_watched(
         tmdb_type,
@@ -71,6 +75,13 @@ def add_to_library_on_watched(
         skip_resume=skip_resume,
         strm_path=strm_path,
     )
+
+    # Resume/watched syncing should still run for already-added items without waiting for a scan event.
+    if is_already_added:
+        _run_pending_sync_worker(
+            timeout_seconds=FAST_POLL_TIMEOUT_SECONDS,
+            interval_ms=FAST_POLL_INTERVAL_MS)
+        return
 
     thread = threading.Thread(
         target=_do_add,
@@ -111,7 +122,7 @@ def _queue_pending_watched(
     return content_id
 
 
-def process_pending_watched():
+def process_pending_watched(timeout_seconds=DEFAULT_POLL_TIMEOUT_SECONDS, interval_ms=DEFAULT_POLL_INTERVAL_MS):
     pending = _load_json(PENDING_WATCHED_FILENAME)
     if not pending:
         return
@@ -141,6 +152,8 @@ def process_pending_watched():
             imdb_id=imdb_id,
             tvdb_id=tvdb_id,
             strm_path=strm_path,
+            timeout_seconds=timeout_seconds,
+            interval_ms=interval_ms,
         )
         if not dbid:
             continue
@@ -282,6 +295,14 @@ def _set_resume_progress(rpc, tmdb_type, dbid, position, total):
     except Exception as exc:
         kodi_log(f'LIBRARY AUTO-ADD: [Resume] JSONRPC error\n{exc}', 2)
         return False
+
+
+def _run_pending_sync_worker(timeout_seconds=DEFAULT_POLL_TIMEOUT_SECONDS, interval_ms=DEFAULT_POLL_INTERVAL_MS):
+    thread = threading.Thread(
+        target=process_pending_watched,
+        kwargs={'timeout_seconds': timeout_seconds, 'interval_ms': interval_ms},
+        daemon=True)
+    thread.start()
 
 
 def _do_add(content_id, tmdb_type, tmdb_id, season=0, episode=0):
