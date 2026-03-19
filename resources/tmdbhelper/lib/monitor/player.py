@@ -207,11 +207,11 @@ class PlayerMonitor(Player, CommonMonitorFunctions):
         self.get_playingitem()
 
     def onPlayBackEnded(self):
-        self.scrobbler_stop()
+        self.scrobbler_stop(self.get_playback_snapshot())
         self.reset_properties()
 
     def onPlayBackStopped(self):
-        self.scrobbler_stop()
+        self.scrobbler_stop(self.get_playback_snapshot())
         self.reset_properties()
 
     def onPlayBackPaused(self):
@@ -261,11 +261,11 @@ class PlayerMonitor(Player, CommonMonitorFunctions):
         self.scrobbler_update()
         self.scrobbler.pause(self.tmdb_type, self.tmdb_id)
 
-    def scrobbler_stop(self):
+    def scrobbler_stop(self, playback_snapshot=None):
         if not self.scrobbler:
             return
-        self.scrobbler_update()
-        self.scrobbler.stop(self.tmdb_type, self.tmdb_id)
+        self.scrobbler_update(playback_snapshot)
+        self.scrobbler.stop(self.tmdb_type, self.tmdb_id, playback_snapshot=playback_snapshot)
 
     def scrobbler_sync(self):
         if not self.scrobbler or not self.isPlayingVideo():
@@ -278,10 +278,44 @@ class PlayerMonitor(Player, CommonMonitorFunctions):
         self.scrobbler_update()
         self.scrobbler.sync(self.tmdb_type, self.tmdb_id)
 
-    def scrobbler_update(self):
-        if not self.scrobbler or not self.isPlayingVideo():
+    def scrobbler_update(self, playback_snapshot=None):
+        if not self.scrobbler:
+            return
+        if playback_snapshot and playback_snapshot.get('current_time') is not None:
+            self.scrobbler.update_time(
+                playback_snapshot.get('tmdb_type') or self.tmdb_type,
+                playback_snapshot.get('tmdb_id') or self.tmdb_id,
+                playback_snapshot['current_time'])
+            return
+        if not self.isPlayingVideo():
             return
         self.scrobbler.update_time(self.tmdb_type, self.tmdb_id, self.getTime())
+
+    def get_playback_snapshot(self):
+        if not self.scrobbler:
+            return {}
+
+        def _safe_get(func):
+            try:
+                return func()
+            except Exception:
+                return None
+
+        current_time = _safe_get(self.getTime)
+        total_time = _safe_get(self.getTotalTime)
+        current_time = current_time if current_time is not None else self.scrobbler.current_time
+        total_time = total_time if total_time is not None else self.scrobbler.total_time
+
+        return {
+            'tmdb_type': self.scrobbler.tmdb_type,
+            'tmdb_id': self.scrobbler.tmdb_id,
+            'season': self.scrobbler.season,
+            'episode': self.scrobbler.episode,
+            'imdb_id': self.scrobbler.imdb_id,
+            'tvdb_id': self.scrobbler.tvdb_id,
+            'current_time': current_time or 0,
+            'total_time': total_time or 0,
+        }
 
     @cached_property
     def player_item(self):

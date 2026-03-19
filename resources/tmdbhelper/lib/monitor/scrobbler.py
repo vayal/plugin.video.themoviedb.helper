@@ -144,16 +144,27 @@ class PlayerScrobbler():
         return self.sync(tmdb_type, tmdb_id)  # Trakt no longer supports a pause method so just return after checking sync
 
     @is_scrobbling
-    def stop(self, tmdb_type, tmdb_id):
+    def stop(self, tmdb_type, tmdb_id, playback_snapshot=None):
         if not self.started or self.stopped:
             return
+        self.apply_playback_snapshot(playback_snapshot)
         kodi_log(f'SCROBBLER: [Stop] {self.content_id} -- {self.progress:.2f}%', 2)
         self.trakt_scrobbling('stop') if not self.syncing else None
         self.set_kodi_watched()
         self.set_tmdb_ratings()
         self.update_stats()
-        self.add_to_library_on_watched()
+        self.add_to_library_on_watched(playback_snapshot=playback_snapshot)
         self.stopped = True
+
+    def apply_playback_snapshot(self, playback_snapshot):
+        if not playback_snapshot:
+            return
+        snapshot_total = playback_snapshot.get('total_time') or 0
+        snapshot_current = playback_snapshot.get('current_time')
+        if snapshot_total:
+            self.total_time = snapshot_total
+        if snapshot_current is not None:
+            self.current_time = snapshot_current
 
     @is_scrobbling
     @is_trakt_authorized
@@ -207,15 +218,30 @@ class PlayerScrobbler():
         )
 
     @is_scrobbling
-    def add_to_library_on_watched(self):
-        threshold = get_setting('library_autoadd_threshold', 'int') or 80
-        if self.progress < threshold:
+    def add_to_library_on_watched(self, playback_snapshot=None):
+        autoadd_threshold = get_setting('library_autoadd_threshold', 'int') or 80
+        if self.progress < autoadd_threshold:
             return
+        resume_position = (
+            (playback_snapshot or {}).get('current_time')
+            if playback_snapshot else None
+        )
+        resume_total = (
+            (playback_snapshot or {}).get('total_time')
+            if playback_snapshot else None
+        )
+        resume_position = self.current_time if resume_position is None else resume_position
+        resume_total = self.total_time if resume_total is None else resume_total
+        mark_watched = self.progress >= 80
         from tmdbhelper.lib.monitor.libadd import add_to_library_on_watched
         add_to_library_on_watched(
             self.tmdb_type, self.tmdb_id,
             season=self.season, episode=self.episode,
-            imdb_id=self.imdb_id, tvdb_id=self.tvdb_id)
+            imdb_id=self.imdb_id, tvdb_id=self.tvdb_id,
+            resume_position=resume_position,
+            resume_total=resume_total,
+            mark_watched=mark_watched,
+            skip_resume=mark_watched)
 
     @is_scrobbling
     def set_kodi_watched(self):
