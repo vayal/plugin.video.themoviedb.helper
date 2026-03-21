@@ -141,6 +141,9 @@ ROUTE_NOID = {
     'library_airingnext': {'route': {
         'module_name': 'tmdbhelper.lib.items.directories.trakt.lists_airingnext',
         'import_attr': 'ListLibraryAiringNext'}},
+    'local_next_up': {'route': {
+        'module_name': 'tmdbhelper.lib.items.directories.kodi.lists_local_next_up',
+        'import_attr': 'ListLocalNextUp'}},
     'trakt_airingnext': {'route': {
         'module_name': 'tmdbhelper.lib.items.directories.trakt.lists_airingnext',
         'import_attr': 'ListTraktAiringNext'}},

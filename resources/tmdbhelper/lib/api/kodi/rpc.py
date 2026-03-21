@@ -13,6 +13,34 @@ def get_jsonrpc(method=None, params=None, query_id=1):
     return jurialmunkey_jsnrpc.get_jsonrpc(method, params, query_id)
 
 
+def set_video_resume(dbtype, dbid, position, total):
+    """
+    Set partial resume point in Kodi MyVideos via JSON-RPC.
+    dbtype: 'episode' or 'movie' (matches set_watched dbtype naming).
+    """
+    from tmdbhelper.lib.addon.logger import kodi_log
+    try:
+        if dbtype == 'episode':
+            method = 'VideoLibrary.SetEpisodeDetails'
+            id_key = 'episodeid'
+        else:
+            method = 'VideoLibrary.SetMovieDetails'
+            id_key = 'movieid'
+
+        params = {
+            id_key: int(dbid),
+            'resume': {
+                'position': float(position),
+                'total': float(total),
+            }
+        }
+        response = get_jsonrpc(method, params)
+        return bool(response and response.get('result') == 'OK')
+    except Exception as exc:
+        kodi_log(f'KodiRPC: [set_video_resume] JSONRPC error\n{exc}', 2)
+        return False
+
+
 def get_kodi_library(tmdb_type, tvshowid=None, cache_refresh=False):
     if tmdb_type == 'movie':
         return KodiLibrary(dbtype='movie', cache_refresh=cache_refresh)

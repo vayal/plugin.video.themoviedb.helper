@@ -150,6 +150,7 @@ class PlayerScrobbler():
         self.apply_playback_snapshot(playback_snapshot)
         kodi_log(f'SCROBBLER: [Stop] {self.content_id} -- {self.progress:.2f}%', 2)
         self.trakt_scrobbling('stop') if not self.syncing else None
+        self.set_kodi_resume_partial()
         self.set_kodi_watched()
         self.set_tmdb_ratings()
         self.update_stats()
@@ -242,6 +243,53 @@ class PlayerScrobbler():
             resume_total=resume_total,
             mark_watched=mark_watched,
             skip_resume=mark_watched)
+
+    @is_scrobbling
+    def set_kodi_resume_partial(self):
+        """Write resume to Kodi MyVideos for items already in the library (independent of auto-add threshold)."""
+        if self.progress >= 80:
+            return
+        if not self.current_time:
+            return
+        from tmdbhelper.lib.monitor.libadd import has_valid_resume
+        if not has_valid_resume(self.current_time, self.total_time):
+            return
+
+        import tmdbhelper.lib.api.kodi.rpc as rpc
+
+        if self.tmdb_type == 'tv':
+            tvshowid = rpc.KodiLibrary('tvshow').get_info(
+                info='dbid',
+                imdb_id=self.imdb_id,
+                tmdb_id=self.tmdb_id,
+                tvdb_id=self.tvdb_id)
+            if not tvshowid:
+                return
+            dbid = rpc.KodiLibrary('episode', tvshowid).get_info(
+                info='dbid',
+                season=self.season,
+                episode=self.episode)
+            if not dbid:
+                return
+            if rpc.set_video_resume('episode', dbid, self.current_time, self.total_time):
+                kodi_log(
+                    f'SCROBBLER: [Kodi resume] {self.content_id} ({self.current_time:.2f}/{self.total_time:.2f})',
+                    2)
+            return
+
+        if self.tmdb_type == 'movie':
+            dbid = rpc.KodiLibrary('movie').get_info(
+                info='dbid',
+                imdb_id=self.imdb_id,
+                tmdb_id=self.tmdb_id,
+                tvdb_id=self.tvdb_id)
+            if not dbid:
+                return
+            if rpc.set_video_resume('movie', dbid, self.current_time, self.total_time):
+                kodi_log(
+                    f'SCROBBLER: [Kodi resume] {self.content_id} ({self.current_time:.2f}/{self.total_time:.2f})',
+                    2)
+            return
 
     @is_scrobbling
     def set_kodi_watched(self):

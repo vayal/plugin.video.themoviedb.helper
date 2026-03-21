@@ -2695,6 +2695,11 @@ msgctxt "#32538"
 msgid "Minimum watched percentage"
 msgstr ""
 
+#: /resources/tmdbhelper/lib/items/directories/kodi/lists_local_next_up.py
+msgctxt "#32539"
+msgid "Local Next Up"
+msgstr ""
+
 msgctxt "#30030"
 msgid "Hindi (India)"
 msgstr ""

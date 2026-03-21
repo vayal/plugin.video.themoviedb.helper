@@ -1,5 +1,5 @@
 {
-    "python.languageServer": "Pylance",
+    "python.languageServer": "None",
     "python.envFile": "${workspaceFolder}/.venv",
     "python.terminal.activateEnvInCurrentTerminal": true,
     "cursorpyright.analysis.ignore": [

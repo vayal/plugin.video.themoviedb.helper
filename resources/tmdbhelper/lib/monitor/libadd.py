@@ -169,7 +169,7 @@ def process_pending_watched(timeout_seconds=DEFAULT_POLL_TIMEOUT_SECONDS, interv
             processed.append(content_id)
             continue
 
-        if not _has_valid_resume(resume_position, resume_total):
+        if not has_valid_resume(resume_position, resume_total):
             kodi_log(f'LIBRARY AUTO-ADD: [Resume] Invalid payload {content_id}', 2)
             processed.append(content_id)
             continue
@@ -270,31 +270,13 @@ def _normalize_path(path):
     return os.path.normcase(os.path.normpath(path))
 
 
-def _has_valid_resume(position, total):
+def has_valid_resume(position, total):
     return bool(total and position and total > 0 and position > 0 and position < total)
 
 
 def _set_resume_progress(rpc, tmdb_type, dbid, position, total):
-    try:
-        if tmdb_type == 'tv':
-            method = 'VideoLibrary.SetEpisodeDetails'
-            id_key = 'episodeid'
-        else:
-            method = 'VideoLibrary.SetMovieDetails'
-            id_key = 'movieid'
-
-        params = {
-            id_key: int(dbid),
-            'resume': {
-                'position': float(position),
-                'total': float(total),
-            }
-        }
-        response = rpc.get_jsonrpc(method, params)
-        return bool(response and response.get('result') == 'OK')
-    except Exception as exc:
-        kodi_log(f'LIBRARY AUTO-ADD: [Resume] JSONRPC error\n{exc}', 2)
-        return False
+    dbtype = 'episode' if tmdb_type == 'tv' else 'movie'
+    return rpc.set_video_resume(dbtype, dbid, position, total)
 
 
 def _run_pending_sync_worker(timeout_seconds=DEFAULT_POLL_TIMEOUT_SECONDS, interval_ms=DEFAULT_POLL_INTERVAL_MS):
@@ -318,6 +300,9 @@ def _do_add(content_id, tmdb_type, tmdb_id, season=0, episode=0):
             kodi_log(f'LIBRARY AUTO-ADD: [Path] {strm_path}', 2)
     except Exception as exc:
         kodi_log(f'LIBRARY AUTO-ADD: [Error] {tmdb_type}.{tmdb_id}\n{exc}', 1)
+    _run_pending_sync_worker(
+        timeout_seconds=DEFAULT_POLL_TIMEOUT_SECONDS,
+        interval_ms=DEFAULT_POLL_INTERVAL_MS)
 
 
 def _set_pending_strm_path(content_id, strm_path):
