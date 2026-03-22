@@ -106,6 +106,16 @@ class BaseDirItemTMDbLibraryAiringNext(BaseDirItem):
     group = 14022
 
 
+class BaseDirItemTMDbLibraryLocalNextUp(BaseDirItem):
+    priority = 205
+    label_type = 'localize'
+    label_localized = 32539
+    types = ('tv',)
+    params = {'info': 'local_next_up'}
+    art_icon = 'resources/icons/themoviedb/airing.png'
+    group = 32539
+
+
 class BaseDirItemTMDbGenres(BaseDirItem):
     priority = 210
     label_type = 'reversed'
